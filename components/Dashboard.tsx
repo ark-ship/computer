@@ -1782,7 +1782,7 @@ export default function Dashboard() {
       <footer className="os-footer">
 
         <span>
-          SUPER COMPUTERS OS v1.0
+          SUPER COMPUTERS v1.0
         </span>
 
         <span>
