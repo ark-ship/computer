@@ -1201,6 +1201,43 @@ export default function Dashboard() {
               </small>
             </button>
 
+            <div className="coming-soon-menu">
+
+  <div className="coming-soon-title">
+    <span>SYSTEMS</span>
+    <small>SOON</small>
+  </div>
+
+  <div className="coming-soon-items">
+
+    <div className="coming-soon-item">
+      <span>↕</span>
+      <strong>TRADE</strong>
+      <small>SOON</small>
+    </div>
+
+    <div className="coming-soon-item">
+      <span>◈</span>
+      <strong>ANALYTICS</strong>
+      <small>SOON</small>
+    </div>
+
+    <div className="coming-soon-item">
+      <span>◆</span>
+      <strong>MARKET</strong>
+      <small>SOON</small>
+    </div>
+
+    <div className="coming-soon-item">
+      <span>+</span>
+      <strong>MORE</strong>
+      <small>SOON</small>
+    </div>
+
+  </div>
+
+</div>
+
           </nav>
 
 

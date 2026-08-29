@@ -336,9 +336,12 @@ a {
 
   display: grid;
 
-  grid-template-columns: 250px minmax(0, 1fr);
+  grid-template-columns:
+    250px
+    minmax(0, 1fr);
 
   border-left: 1px solid var(--line);
+
   border-right: 1px solid var(--line);
 }
 
@@ -354,6 +357,7 @@ a {
   padding: 20px;
 
   display: flex;
+
   flex-direction: column;
 }
 
@@ -379,6 +383,7 @@ a {
   display: flex;
 
   align-items: center;
+
   justify-content: center;
 
   position: relative;
@@ -463,7 +468,8 @@ a {
 .nft-selector-grid {
   display: grid;
 
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns:
+    repeat(3, 1fr);
 
   grid-gap: 5px;
 
@@ -484,6 +490,7 @@ a {
   display: flex;
 
   align-items: center;
+
   justify-content: center;
 
   overflow: hidden;
@@ -517,6 +524,7 @@ a {
   padding: 18px 0;
 
   border-bottom: 1px solid var(--line);
+
   border-top: 1px solid var(--line);
 
   margin-top: 14px;
@@ -524,6 +532,7 @@ a {
 
 .sidebar-unit div {
   color: var(--dim);
+
   font-size: 7px;
 }
 
@@ -571,6 +580,7 @@ a {
   font-size: 8px;
 
   display: flex;
+
   align-items: center;
 }
 
@@ -584,6 +594,7 @@ a {
 
 .os-menu button:hover {
   background: #0f120e;
+
   color: var(--text);
 }
 
@@ -619,6 +630,7 @@ a {
 
 .menu-ai-soon:hover {
   background: #0f120e;
+
   color: var(--text);
 }
 
@@ -632,6 +644,126 @@ a {
 
 .menu-ai-soon.menu-active span {
   color: var(--lime);
+}
+
+/* ==========================================================
+   COMING SOON SYSTEMS
+========================================================== */
+
+.coming-soon-menu {
+  margin-top: 14px;
+
+  border-top: 1px solid var(--line);
+
+  padding-top: 12px;
+
+  width: 100%;
+}
+
+.coming-soon-title {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  margin-bottom: 7px;
+}
+
+.coming-soon-title span {
+  color: var(--dim);
+
+  font-family: "Press Start 2P", monospace;
+
+  font-size: 6px;
+}
+
+.coming-soon-title small {
+  color: var(--dim);
+
+  font-family: "DM Mono", monospace;
+
+  font-size: 5px;
+}
+
+.coming-soon-items {
+  display: grid;
+
+  grid-gap: 3px;
+
+  gap: 3px;
+
+  width: 100%;
+}
+
+.coming-soon-item {
+  width: 100%;
+
+  min-height: 31px;
+
+  display: flex;
+
+  align-items: center;
+
+  padding: 0 8px;
+
+  border: 1px solid #171b15;
+
+  background: #080a07;
+
+  color: var(--dim);
+
+  font-family: "DM Mono", monospace;
+}
+
+.coming-soon-item > span {
+  width: 22px;
+
+  flex: 0 0 22px;
+
+  color: #454d3d;
+
+  font-size: 8px;
+
+  text-align: left;
+}
+
+.coming-soon-item strong {
+  color: var(--dim);
+
+  font-family: "Press Start 2P", monospace;
+
+  font-size: 5px;
+
+  font-weight: 400;
+
+  white-space: nowrap;
+}
+
+.coming-soon-item small {
+  margin-left: auto;
+
+  color: #353c2f;
+
+  font-family: "DM Mono", monospace;
+
+  font-size: 5px;
+
+  white-space: nowrap;
+}
+
+.coming-soon-item:hover {
+  border-color: var(--line-light);
+
+  color: var(--muted);
+}
+
+.coming-soon-item:hover > span {
+  color: var(--lime);
+}
+
+.coming-soon-item:hover strong {
+  color: var(--text);
 }
 
 /* ==========================================================
@@ -772,6 +904,7 @@ a {
 
 .display-header span {
   color: var(--dim);
+
   font-size: 7px;
 }
 
@@ -841,7 +974,7 @@ a {
 }
 
 /* ==========================================================
-   REAL NFT MAIN DISPLAY
+   MAIN NFT
 ========================================================== */
 
 .real-nft-display {
@@ -853,6 +986,7 @@ a {
   display: flex;
 
   align-items: center;
+
   justify-content: center;
 
   z-index: 2;
@@ -870,9 +1004,13 @@ a {
   display: block;
 
   image-rendering: pixelated;
+
   image-rendering: crisp-edges;
 
-  filter: drop-shadow(12px 12px 0 #000);
+  filter:
+    drop-shadow(
+      12px 12px 0 #000
+    );
 }
 
 .main-nft-placeholder {
@@ -884,6 +1022,7 @@ a {
   display: flex;
 
   align-items: center;
+
   justify-content: center;
 
   text-align: center;
@@ -923,7 +1062,8 @@ a {
 
   border: 13px solid #050605;
 
-  box-shadow: 9px 9px 0 #000;
+  box-shadow:
+    9px 9px 0 #000;
 }
 
 .big-screen {
@@ -1012,6 +1152,7 @@ a {
 
 .monitor-controls b {
   margin-left: auto;
+
   background: var(--lime);
 }
 
@@ -1031,7 +1172,8 @@ a {
 
   border: 10px solid #050605;
 
-  box-shadow: 9px 9px 0 #000;
+  box-shadow:
+    9px 9px 0 #000;
 
   z-index: 5;
 }
@@ -1043,7 +1185,8 @@ a {
 
   display: grid;
 
-  grid-template-columns: repeat(12, 1fr);
+  grid-template-columns:
+    repeat(12, 1fr);
 
   grid-gap: 4px;
 
@@ -1094,7 +1237,8 @@ a {
 
   z-index: 5;
 
-  background: rgba(7, 9, 7, 0.5);
+  background:
+    rgba(7, 9, 7, 0.5);
 }
 
 .display-footer span {
@@ -1146,7 +1290,9 @@ a {
 .assignment-grid {
   display: grid;
 
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns:
+    1fr
+    1fr;
 
   min-height: 205px;
 }
@@ -1350,6 +1496,7 @@ a {
 
 .row-number {
   color: var(--dim);
+
   font-size: 8px;
 }
 
@@ -1417,6 +1564,7 @@ a {
 
 .row-check small {
   color: var(--dim);
+
   font-size: 6px;
 }
 
@@ -1606,6 +1754,7 @@ a {
   display: flex;
 
   align-items: center;
+
   justify-content: center;
 
   border: 1px solid var(--lime);
@@ -1616,7 +1765,8 @@ a {
 
   font-size: 18px;
 
-  box-shadow: 6px 6px 0 #000;
+  box-shadow:
+    6px 6px 0 #000;
 }
 
 .ai-title {
@@ -1624,7 +1774,9 @@ a {
 
   color: var(--lime);
 
-  font-family: "Press Start 2P", monospace !important;
+  font-family:
+    "Press Start 2P",
+    monospace !important;
 
   font-size: 11px !important;
 
@@ -1638,7 +1790,9 @@ a {
 
   color: var(--muted);
 
-  font-family: "Press Start 2P", monospace !important;
+  font-family:
+    "Press Start 2P",
+    monospace !important;
 
   font-size: 6px !important;
 
@@ -1667,6 +1821,7 @@ a {
   display: flex;
 
   align-items: center;
+
   justify-content: center;
 
   gap: 5px;
@@ -1698,7 +1853,9 @@ a {
 
   color: var(--dim);
 
-  font-family: "Press Start 2P", monospace !important;
+  font-family:
+    "Press Start 2P",
+    monospace !important;
 
   font-size: 6px !important;
 
@@ -1753,7 +1910,9 @@ a {
 
     display: grid;
 
-    grid-template-columns: 180px 1fr;
+    grid-template-columns:
+      180px
+      1fr;
 
     grid-gap: 14px;
 
@@ -1779,6 +1938,10 @@ a {
 
     margin-top: 10px;
   }
+
+  .coming-soon-menu {
+    grid-column: 2;
+  }
 }
 
 @media (max-width: 700px) {
@@ -1796,6 +1959,7 @@ a {
 
   .desktop {
     border-left: 0;
+
     border-right: 0;
   }
 
@@ -1820,7 +1984,8 @@ a {
   .sidebar-bottom {
     display: grid;
 
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns:
+      repeat(3, 1fr);
 
     margin-top: 10px;
   }
@@ -1890,7 +2055,8 @@ a {
   }
 
   .nft-selector-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns:
+      repeat(4, 1fr);
   }
 
   .owned-nft-image {
@@ -1900,5 +2066,9 @@ a {
 
   .ai-soon-content {
     min-height: 360px;
+  }
+
+  .coming-soon-menu {
+    margin-top: 14px;
   }
 }
