@@ -1,7 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { ethers } from "ethers";
 
 declare global {
@@ -62,7 +67,9 @@ function shortAddress(value: string) {
 }
 
 function formatTime(value?: string | null) {
-  if (!value) return "--:--";
+  if (!value) {
+    return "--:--";
+  }
 
   const date = new Date(value);
 
@@ -203,11 +210,11 @@ export default function Dashboard() {
   const [balance, setBalance] = useState("0");
 
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [events, setEvents] =
-    useState<EventItem[]>([]);
+  const [events, setEvents] = useState<EventItem[]>(
+    []
+  );
 
-  const [nfts, setNfts] =
-    useState<NFTItem[]>([]);
+  const [nfts, setNfts] = useState<NFTItem[]>([]);
 
   const [selectedNFT, setSelectedNFT] =
     useState<NFTItem | null>(null);
@@ -239,6 +246,9 @@ export default function Dashboard() {
 
   const [utcTime, setUtcTime] =
     useState("");
+
+  const lastEventIdRef =
+    useRef("");
 
   const activeCount = useMemo(
     () =>
@@ -302,64 +312,228 @@ export default function Dashboard() {
   }, []);
 
   /* ==========================================================
-     REALTIME SIGNAL STREAM
+     LOAD ACCOUNT
+  ========================================================== */
+
+  async function loadAccount() {
+    const response =
+      await fetch(
+        "/api/me",
+        {
+          cache: "no-store",
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ===
+          "WALLET_DOES_NOT_OWN_COMPUTER"
+          ? "WALLET HAS NO SUPER COMPUTER"
+          : data.error ||
+              "ACCOUNT LOAD FAILED"
+      );
+    }
+
+    setWallet(
+      data.wallet ?? ""
+    );
+
+    setBalance(
+      data.balance ?? "0"
+    );
+
+    setTasks(
+      data.tasks ?? []
+    );
+
+    setEvents(
+      data.events ?? []
+    );
+
+    const ownedNFTs =
+      normalizeNFTs(data);
+
+    setNfts(ownedNFTs);
+
+    setSelectedNFT((current) => {
+      if (
+        current &&
+        ownedNFTs.some(
+          (nft) =>
+            nft.identifier ===
+            current.identifier
+        )
+      ) {
+        return current;
+      }
+
+      return (
+        ownedNFTs[0] ??
+        null
+      );
+    });
+  }
+
+  /* ==========================================================
+     LOAD NFTS
+  ========================================================== */
+
+  async function loadNFTs(
+    address: string
+  ) {
+    try {
+      const response =
+        await fetch(
+          `/api/nfts?address=${encodeURIComponent(
+            address
+          )}`,
+          {
+            cache: "no-store",
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "UNABLE TO LOAD COMPUTERS"
+        );
+      }
+
+      const ownedNFTs =
+        normalizeNFTs(data);
+
+      setNfts(ownedNFTs);
+
+      setSelectedNFT((current) => {
+        if (
+          current &&
+          ownedNFTs.some(
+            (nft) =>
+              nft.identifier ===
+              current.identifier
+          )
+        ) {
+          return current;
+        }
+
+        return (
+          ownedNFTs[0] ??
+          null
+        );
+      });
+    } catch (err) {
+      console.error(
+        "NFT loading failed:",
+        err
+      );
+    }
+  }
+
+  /* ==========================================================
+     REALTIME SIGNAL UPDATES
   ========================================================== */
 
   useEffect(() => {
-    if (!wallet) {
-      return;
-    }
+  if (!wallet) {
+    return;
+  }
 
-    const stream = new EventSource(
-      `/api/events/stream?wallet=${encodeURIComponent(
-        wallet
-      )}`
-    );
+  let stopped = false;
 
-    stream.onmessage = (message) => {
+  const loadLatestEvents =
+    async () => {
       try {
-        const data = JSON.parse(
-          message.data
-        );
+        const lastEventId =
+          lastEventIdRef.current;
 
-        /*
-         * Connection event / heartbeat
-         */
+        const url = lastEventId
+          ? `/api/events/latest?wallet=${encodeURIComponent(
+              wallet
+            )}&after=${encodeURIComponent(
+              lastEventId
+            )}`
+          : `/api/events/latest?wallet=${encodeURIComponent(
+              wallet
+            )}`;
+
+        const response =
+          await fetch(url, {
+            cache: "no-store",
+          });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data =
+          await response.json();
+
         if (
-          data?.type !== "event" ||
-          !data?.event
+          stopped ||
+          !Array.isArray(data.events)
         ) {
           return;
         }
 
-        const incomingEvent =
-          data.event as EventItem;
+        if (!lastEventId) {
+          setEvents(data.events);
+
+          if (
+            data.events.length > 0
+          ) {
+            lastEventIdRef.current =
+              data.events[0].id;
+          }
+
+          return;
+        }
+
+        if (
+          data.events.length === 0
+        ) {
+          return;
+        }
+
+        lastEventIdRef.current =
+          data.events[
+            data.events.length - 1
+          ].id;
 
         setEvents((current) => {
-          const alreadyExists =
-            current.some(
-              (event) =>
-                event.id ===
-                incomingEvent.id
+          const existingIds =
+            new Set(
+              current.map(
+                (event) =>
+                  event.id
+              )
             );
 
-          if (alreadyExists) {
+          const newEvents =
+            data.events.filter(
+              (event: EventItem) =>
+                !existingIds.has(
+                  event.id
+                )
+            );
+
+          if (
+            newEvents.length === 0
+          ) {
             return current;
           }
 
           return [
-            incomingEvent,
+            ...newEvents.reverse(),
             ...current,
           ];
         });
 
-        /*
-         * Refresh task metadata:
-         *
-         * last_checked_at
-         * last_triggered_at
-         * worker state
-         */
         loadAccount().catch(
           (accountError) => {
             console.error(
@@ -368,28 +542,29 @@ export default function Dashboard() {
             );
           }
         );
-      } catch (streamError) {
+      } catch (error) {
         console.error(
-          "SSE message parse failed:",
-          streamError
+          "Realtime event check failed:",
+          error
         );
       }
     };
 
-    stream.onerror = () => {
-      /*
-       * Browser's EventSource automatically
-       * attempts to reconnect.
-       */
-      console.warn(
-        "Signal stream disconnected. Reconnecting..."
-      );
-    };
+  loadLatestEvents();
 
-    return () => {
-      stream.close();
-    };
-  }, [wallet]);
+  const interval =
+    window.setInterval(
+      loadLatestEvents,
+      1000
+    );
+
+  return () => {
+    stopped = true;
+    window.clearInterval(
+      interval
+    );
+  };
+}, [wallet]);
 
   /* ==========================================================
      ROBINHOOD NETWORK
@@ -417,7 +592,8 @@ export default function Dashboard() {
         "wallet_switchEthereumChain",
         [
           {
-            chainId: CHAIN_HEX,
+            chainId:
+              CHAIN_HEX,
           },
         ]
       );
@@ -518,7 +694,9 @@ export default function Dashboard() {
       const challenge =
         await challengeResponse.json();
 
-      if (!challengeResponse.ok) {
+      if (
+        !challengeResponse.ok
+      ) {
         throw new Error(
           challenge.error ||
             "AUTH CHALLENGE FAILED"
@@ -573,120 +751,6 @@ export default function Dashboard() {
       );
     } finally {
       setLoading(false);
-    }
-  }
-
-  /* ==========================================================
-     LOAD ACCOUNT
-  ========================================================== */
-
-  async function loadAccount() {
-    const response =
-      await fetch(
-        "/api/me",
-        {
-          cache: "no-store",
-        }
-      );
-
-    const data =
-      await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data.error ===
-          "WALLET_DOES_NOT_OWN_COMPUTER"
-          ? "WALLET HAS NO SUPER COMPUTER"
-          : data.error ||
-              "ACCOUNT LOAD FAILED"
-      );
-    }
-
-    setWallet(data.wallet ?? "");
-    setBalance(data.balance ?? "0");
-
-    setTasks(data.tasks ?? []);
-    setEvents(data.events ?? []);
-
-    const ownedNFTs =
-      normalizeNFTs(data);
-
-    setNfts(ownedNFTs);
-
-    setSelectedNFT((current) => {
-      if (
-        current &&
-        ownedNFTs.some(
-          (nft) =>
-            nft.identifier ===
-            current.identifier
-        )
-      ) {
-        return current;
-      }
-
-      return (
-        ownedNFTs[0] ??
-        null
-      );
-    });
-  }
-
-  /* ==========================================================
-     LOAD NFTS
-  ========================================================== */
-
-  async function loadNFTs(
-    address: string
-  ) {
-    try {
-      const response =
-        await fetch(
-          `/api/nfts?address=${encodeURIComponent(
-            address
-          )}`,
-          {
-            cache: "no-store",
-          }
-        );
-
-      const data =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-            "UNABLE TO LOAD COMPUTERS"
-        );
-      }
-
-      const ownedNFTs =
-        normalizeNFTs(data);
-
-      setNfts(ownedNFTs);
-
-      setSelectedNFT((current) => {
-        if (
-          current &&
-          ownedNFTs.some(
-            (nft) =>
-              nft.identifier ===
-              current.identifier
-          )
-        ) {
-          return current;
-        }
-
-        return (
-          ownedNFTs[0] ??
-          null
-        );
-      });
-    } catch (err) {
-      console.error(
-        "NFT loading failed:",
-        err
-      );
     }
   }
 
@@ -905,7 +969,9 @@ export default function Dashboard() {
         return response.json();
       })
       .then((data) => {
-        if (!data) return;
+        if (!data) {
+          return;
+        }
 
         setWallet(
           data.wallet ?? ""
@@ -926,7 +992,9 @@ export default function Dashboard() {
         const ownedNFTs =
           normalizeNFTs(data);
 
-        setNfts(ownedNFTs);
+        setNfts(
+          ownedNFTs
+        );
 
         setSelectedNFT(
           ownedNFTs[0] ?? null
@@ -935,12 +1003,14 @@ export default function Dashboard() {
         if (data.wallet) {
           loadNFTs(
             data.wallet
-          ).catch((loadError) => {
-            console.error(
-              "NFT session loading failed:",
-              loadError
-            );
-          });
+          ).catch(
+            (loadError) => {
+              console.error(
+                "NFT session loading failed:",
+                loadError
+              );
+            }
+          );
         }
       })
       .catch(() => {});
@@ -957,9 +1027,13 @@ export default function Dashboard() {
         <div className="boot-box">
 
           <div className="boot-logo">
+
             <span />
+
             SUPER COMPUTERS
+
           </div>
+
 
           <div className="boot-lines">
 
@@ -1231,6 +1305,7 @@ export default function Dashboard() {
             </div>
 
             <strong>
+
               {selectedNFT
                 ? `SC-${String(
                     selectedNFT.identifier
@@ -1239,6 +1314,7 @@ export default function Dashboard() {
                     "0"
                   )}`
                 : "SC----"}
+
             </strong>
 
           </div>
@@ -1311,6 +1387,7 @@ export default function Dashboard() {
 
             </button>
 
+
             <div className="coming-soon-menu">
 
               <div className="coming-soon-title">
@@ -1324,6 +1401,7 @@ export default function Dashboard() {
                 </small>
 
               </div>
+
 
               <div className="coming-soon-items">
 
@@ -1497,15 +1575,13 @@ export default function Dashboard() {
 
 
           {/* ==================================================
-              COMPUTER TAB
+              COMPUTER
           ================================================== */}
 
           {tab === "computer" ? (
 
             <div className="window-body">
 
-
-              {/* WORKER DISPLAY */}
 
               <section className="worker-display">
 
@@ -1522,6 +1598,7 @@ export default function Dashboard() {
                     </strong>
 
                   </div>
+
 
                   <div className="display-time">
                     {utcTime || "--:--:--"} UTC

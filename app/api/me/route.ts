@@ -1,74 +1,101 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authRequired } from "@/lib/auth";
-import { assertHolder } from "@/lib/ownership";
-import { initDb, db } from "@/lib/db";
-import { getAccountNFTs } from "@/lib/opensea";
-
-type EventRow = {
-  id: string;
-  task_id: string;
-  message: string;
-  created_at: string;
-};
+import { db, initDb } from "@/lib/db";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const address = authRequired(req);
-    const balance = await assertHolder(address);
+    const wallet = req.nextUrl.searchParams
+      .get("wallet")
+      ?.toLowerCase();
+
+    const after = req.nextUrl.searchParams.get(
+      "after"
+    );
+
+    if (!wallet) {
+      return NextResponse.json(
+        { error: "Wallet is required." },
+        { status: 400 }
+      );
+    }
 
     await initDb();
 
-    const tasks = await db(`
-      SELECT
-        id,
-        type,
-        target,
-        condition,
-        active,
-        last_checked_at,
-        last_triggered_at,
-        created_at
-      FROM worker_tasks
-      WHERE owner = $1
-      ORDER BY created_at DESC
-    `, [address.toLowerCase()]);
+    const events = after
+      ? await db<{
+          id: string;
+          task_id: string;
+          message: string;
+          created_at: string;
+        }>(
+          `
+          SELECT
+            id,
+            task_id,
+            message,
+            created_at
+          FROM worker_events
+          WHERE LOWER(owner) = LOWER($1)
+            AND created_at > (
+              SELECT created_at
+              FROM worker_events
+              WHERE id = $2
+              LIMIT 1
+            )
+          ORDER BY created_at ASC
+          LIMIT 50
+          `,
+          [wallet, after]
+        )
+      : await db<{
+          id: string;
+          task_id: string;
+          message: string;
+          created_at: string;
+        }>(
+          `
+          SELECT
+            id,
+            task_id,
+            message,
+            created_at
+          FROM worker_events
+          WHERE LOWER(owner) = LOWER($1)
+          ORDER BY created_at DESC
+          LIMIT 20
+          `,
+          [wallet]
+        );
 
-    const events = await db<EventRow>(`
-      SELECT id, task_id, message, created_at
-      FROM worker_events
-      WHERE owner = $1
-      ORDER BY created_at DESC
-      LIMIT 20
-    `, [address.toLowerCase()]);
-
-    let nfts: unknown = null;
-
-    try {
-      nfts = await getAccountNFTs(address);
-    } catch {
-      nfts = null;
-    }
-
-    return NextResponse.json({
-      wallet: address,
-      balance: balance.toString(),
-      tasks,
-      events,
-      nfts,
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        events,
+      },
+      {
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate",
+        },
+      }
+    );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unable to load account.";
+    console.error(
+      "Latest events error:",
+      error
+    );
 
-    if (
-      message === "UNAUTHORIZED" ||
-      message === "WALLET_DOES_NOT_OWN_COMPUTER"
-    ) {
-      return NextResponse.json({ error: message }, { status: 401 });
-    }
-
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to load events.",
+      },
+      { status: 500 }
+    );
   }
 }

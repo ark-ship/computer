@@ -1,12 +1,12 @@
 {
+  "/_not-found/page": "/_not-found",
   "/api/auth/logout/route": "/api/auth/logout",
   "/api/auth/challenge/route": "/api/auth/challenge",
   "/api/auth/verify/route": "/api/auth/verify",
   "/api/me/route": "/api/me",
-  "/api/event/stream/route": "/api/event/stream",
   "/api/worker/route": "/api/worker",
+  "/api/events/latest/route": "/api/events/latest",
   "/api/tasks/route": "/api/tasks",
   "/api/webhooks/alchemy/route": "/api/webhooks/alchemy",
-  "/_not-found/page": "/_not-found",
   "/page": "/"
 }

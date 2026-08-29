@@ -1,12 +1,12 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
   "/api/auth/logout/route": "app/api/auth/logout/route.js",
   "/api/auth/challenge/route": "app/api/auth/challenge/route.js",
   "/api/auth/verify/route": "app/api/auth/verify/route.js",
   "/api/me/route": "app/api/me/route.js",
-  "/api/event/stream/route": "app/api/event/stream/route.js",
   "/api/worker/route": "app/api/worker/route.js",
+  "/api/events/latest/route": "app/api/events/latest/route.js",
   "/api/tasks/route": "app/api/tasks/route.js",
   "/api/webhooks/alchemy/route": "app/api/webhooks/alchemy/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
   "/page": "app/page.js"
 }
