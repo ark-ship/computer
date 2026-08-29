@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+
 import { db, initDb } from "@/lib/db";
 import { sendAlert } from "@/lib/alerts";
 import {
   ALCHEMY_WEBHOOK_SECRET,
-  NFT_CONTRACT,
 } from "@/lib/config";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const ZERO_ADDRESS =
   "0x0000000000000000000000000000000000000000";
@@ -15,8 +16,9 @@ const ZERO_ADDRESS =
 const TRANSFER_TOPIC =
   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
-const NFT_CONTRACT_LOWER =
-  NFT_CONTRACT.toLowerCase();
+/* ==========================================================
+   TYPES
+========================================================== */
 
 type AlchemyLog = {
   account?: {
@@ -90,19 +92,31 @@ function verifyAlchemySignature(
     return false;
   }
 
-  const expected =
-    crypto
-      .createHmac(
-        "sha256",
-        ALCHEMY_WEBHOOK_SECRET
-      )
-      .update(rawBody, "utf8")
-      .digest("hex");
+  const expected = crypto
+    .createHmac(
+      "sha256",
+      ALCHEMY_WEBHOOK_SECRET
+    )
+    .update(rawBody, "utf8")
+    .digest("hex");
+
+  const expectedBuffer =
+    Buffer.from(expected, "utf8");
+
+  const receivedBuffer =
+    Buffer.from(signature, "utf8");
+
+  if (
+    expectedBuffer.length !==
+    receivedBuffer.length
+  ) {
+    return false;
+  }
 
   try {
     return crypto.timingSafeEqual(
-      Buffer.from(expected, "utf8"),
-      Buffer.from(signature, "utf8")
+      expectedBuffer,
+      receivedBuffer
     );
   } catch {
     return false;
@@ -110,7 +124,7 @@ function verifyAlchemySignature(
 }
 
 /* ==========================================================
-   PAD HEX ADDRESS
+   TOPIC -> ADDRESS
 ========================================================== */
 
 function topicToAddress(
@@ -120,10 +134,8 @@ function topicToAddress(
     return null;
   }
 
-  const value = topic.replace(
-    /^0x/,
-    ""
-  );
+  const value =
+    topic.replace(/^0x/, "");
 
   if (value.length < 40) {
     return null;
@@ -136,7 +148,7 @@ function topicToAddress(
 }
 
 /* ==========================================================
-   TOKEN ID
+   TOPIC -> TOKEN ID
 ========================================================== */
 
 function topicToTokenId(
@@ -147,10 +159,7 @@ function topicToTokenId(
   }
 
   const clean =
-    topic.replace(
-      /^0x/,
-      ""
-    );
+    topic.replace(/^0x/, "");
 
   if (!clean) {
     return null;
@@ -166,38 +175,38 @@ function topicToTokenId(
 }
 
 /* ==========================================================
-   FIND LOGS SAFELY
+   EXTRACT LOGS
 ========================================================== */
 
 function extractLogs(
   payload: WebhookPayload
 ): AlchemyLog[] {
   return (
-    payload?.event?.data?.block?.logs ?? []
+    payload?.event?.data?.block?.logs ??
+    []
   );
 }
 
 /* ==========================================================
-   CHECK IF LOG IS NFT MINT
+   CHECK NFT MINT
 ========================================================== */
 
 function isMintLog(
   log: AlchemyLog
 ): boolean {
-  const contract =
-    log?.account?.address?.toLowerCase();
-
-  if (
-    !contract ||
-    contract !== NFT_CONTRACT_LOWER
-  ) {
-    return false;
-  }
-
   const topics =
     Array.isArray(log.topics)
       ? log.topics
       : [];
+
+  /*
+   * ERC-721 Transfer:
+   *
+   * topics[0] = Transfer(...)
+   * topics[1] = from
+   * topics[2] = to
+   * topics[3] = tokenId
+   */
 
   if (
     !topics[0] ||
@@ -207,18 +216,6 @@ function isMintLog(
     return false;
   }
 
-  /*
-    ERC-721 Transfer:
-    
-    topics[0] = Transfer(address,address,uint256)
-    topics[1] = from
-    topics[2] = to
-    topics[3] = tokenId
-
-    Mint:
-    from = 0x000...000
-  */
-
   const from =
     topicToAddress(topics[1]);
 
@@ -226,13 +223,18 @@ function isMintLog(
     return false;
   }
 
+  /*
+   * Mint happens when the NFT is transferred
+   * from the zero address.
+   */
+
   return (
     from === ZERO_ADDRESS
   );
 }
 
 /* ==========================================================
-   CREATE EVENT KEY
+   EVENT KEY
 ========================================================== */
 
 function createEventKey(
@@ -256,12 +258,14 @@ function createEventKey(
     txHash,
     String(logIndex),
     tokenId,
-    String(blockNumber ?? "unknown"),
+    String(
+      blockNumber ?? "unknown"
+    ),
   ].join(":");
 }
 
 /* ==========================================================
-   POST
+   POST WEBHOOK
 ========================================================== */
 
 export async function POST(
@@ -269,10 +273,8 @@ export async function POST(
 ) {
   try {
     /*
-      IMPORTANT:
-      We must verify the ORIGINAL raw body.
-    */
-
+     * Read original request body.
+     */
     const rawBody =
       await req.text();
 
@@ -281,6 +283,9 @@ export async function POST(
         "x-alchemy-signature"
       ) ?? "";
 
+    /*
+     * Verify Alchemy.
+     */
     if (
       !verifyAlchemySignature(
         rawBody,
@@ -299,6 +304,9 @@ export async function POST(
       );
     }
 
+    /*
+     * Parse JSON.
+     */
     let payload: WebhookPayload;
 
     try {
@@ -318,9 +326,8 @@ export async function POST(
     }
 
     /*
-      Ignore anything that isn't a GraphQL webhook.
-    */
-
+     * Ignore unsupported webhook types.
+     */
     if (
       payload.type &&
       payload.type !== "GRAPHQL"
@@ -328,8 +335,6 @@ export async function POST(
       return NextResponse.json({
         ok: true,
         ignored: true,
-        reason:
-          "Unsupported webhook type.",
       });
     }
 
@@ -338,25 +343,33 @@ export async function POST(
     const logs =
       extractLogs(payload);
 
-    const block =
-      payload?.event?.data?.block;
-
     const blockNumber =
-      block?.number;
+      payload?.event?.data?.block
+        ?.number;
 
     let checked = 0;
     let triggered = 0;
 
     /*
-      Process every matching mint in the block.
-    */
-
+     * Process every log in the block.
+     */
     for (const log of logs) {
+      /*
+       * Only ERC-721 mint events.
+       */
       if (!isMintLog(log)) {
         continue;
       }
 
       checked++;
+
+      const contractAddress =
+        log?.account?.address
+          ?.toLowerCase();
+
+      if (!contractAddress) {
+        continue;
+      }
 
       const topics =
         Array.isArray(log.topics)
@@ -392,20 +405,19 @@ export async function POST(
         );
 
       /*
-        Find active MINT workers.
-        
-        We match the target against the configured
-        OpenSea slug. Since this webhook is specifically
-        attached to the Super Computers contract, active
-        MINT watchers for this collection can react.
-      */
-
+       * IMPORTANT:
+       *
+       * Match the incoming contract address
+       * against the contract_address stored
+       * on each MINT worker.
+       */
       const tasks =
         await db<{
           id: string;
           owner: string;
           target: string;
-        }>(`
+        }>(
+          `
           SELECT
             id,
             owner,
@@ -413,18 +425,30 @@ export async function POST(
           FROM worker_tasks
           WHERE active = TRUE
             AND type = 'mint'
-            AND LOWER(target) = LOWER($1)
+            AND LOWER(contract_address) = LOWER($1)
           ORDER BY created_at ASC
           LIMIT 500
-        `, [
-          "super-computers",
-        ]);
+          `,
+          [contractAddress]
+        );
 
+      /*
+       * No users are watching this contract.
+       */
+      if (tasks.length === 0) {
+        continue;
+      }
+
+      /*
+       * Trigger every user watching
+       * this collection.
+       */
       for (const task of tasks) {
         const message =
           `🖥️ SUPER COMPUTER ALERT\n\n` +
           `New mint detected.\n\n` +
           `Collection: ${task.target}\n` +
+          `Contract: ${contractAddress}\n` +
           `Token: #${tokenId}\n` +
           `Recipient: ${recipient}\n` +
           `Tx: ${txHash}\n` +
@@ -432,39 +456,35 @@ export async function POST(
           `Your Computer detected the mint.`;
 
         /*
-          Insert only once.
-          
-          Your existing DB constraint:
-          ON CONFLICT (task_id, event_key)
-        */
-
+         * Prevent duplicate signal.
+         */
         const inserted =
           await db<{
             id: string;
           }>(
             `
-              INSERT INTO worker_events
-                (
-                  id,
-                  task_id,
-                  owner,
-                  message,
-                  event_key
-                )
-              VALUES
-                (
-                  $1,
-                  $2,
-                  $3,
-                  $4,
-                  $5
-                )
-              ON CONFLICT (
+            INSERT INTO worker_events
+              (
+                id,
                 task_id,
+                owner,
+                message,
                 event_key
               )
-              DO NOTHING
-              RETURNING id
+            VALUES
+              (
+                $1,
+                $2,
+                $3,
+                $4,
+                $5
+              )
+            ON CONFLICT (
+              task_id,
+              event_key
+            )
+            DO NOTHING
+            RETURNING id
             `,
             [
               crypto.randomUUID(),
@@ -475,20 +495,26 @@ export async function POST(
             ]
           );
 
+        /*
+         * Duplicate event.
+         */
         if (
           inserted.length === 0
         ) {
           continue;
         }
 
+        /*
+         * Update worker.
+         */
         await db(
           `
-            UPDATE worker_tasks
-            SET
-              last_checked_at = NOW(),
-              last_triggered_at = NOW(),
-              last_event_key = $2
-            WHERE id = $1
+          UPDATE worker_tasks
+          SET
+            last_checked_at = NOW(),
+            last_triggered_at = NOW(),
+            last_event_key = $2
+          WHERE id = $1
           `,
           [
             task.id,
@@ -496,16 +522,14 @@ export async function POST(
           ]
         );
 
+        /*
+         * Optional alert system.
+         */
         try {
           await sendAlert(
             message
           );
         } catch (alertError) {
-          /*
-            Alert failure should NOT undo
-            the successful database event.
-          */
-
           console.error(
             "Alert delivery failed:",
             alertError

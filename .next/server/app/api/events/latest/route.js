@@ -31,13 +31,23 @@
     CREATE TABLE IF NOT EXISTS worker_tasks (
       id UUID PRIMARY KEY,
       owner TEXT NOT NULL,
-      type TEXT NOT NULL CHECK (type IN ('wallet', 'floor', 'mint')),
+      type TEXT NOT NULL
+        CHECK (type IN ('wallet', 'floor', 'mint')),
       target TEXT NOT NULL,
       condition TEXT NOT NULL,
+
+      /*
+       * Contract address is used for realtime
+       * mint monitoring.
+       */
+      contract_address TEXT,
+
       active BOOLEAN NOT NULL DEFAULT TRUE,
+
       last_checked_at TIMESTAMPTZ,
       last_triggered_at TIMESTAMPTZ,
       last_event_key TEXT,
+
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
@@ -47,15 +57,26 @@
     CREATE INDEX IF NOT EXISTS worker_tasks_active_idx
       ON worker_tasks(active);
 
+    CREATE INDEX IF NOT EXISTS worker_tasks_contract_idx
+      ON worker_tasks(contract_address);
+  `),await i.query(`
+    ALTER TABLE worker_tasks
+    ADD COLUMN IF NOT EXISTS contract_address TEXT;
+  `),await i.query(`
     CREATE TABLE IF NOT EXISTS worker_events (
       id UUID PRIMARY KEY,
-      task_id UUID NOT NULL REFERENCES worker_tasks(id) ON DELETE CASCADE,
+      task_id UUID NOT NULL
+        REFERENCES worker_tasks(id)
+        ON DELETE CASCADE,
+
       owner TEXT NOT NULL,
       message TEXT NOT NULL,
       event_key TEXT NOT NULL,
+
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
-    CREATE UNIQUE INDEX IF NOT EXISTS worker_events_unique_event
-      ON worker_events(task_id, event_key);
+    CREATE UNIQUE INDEX IF NOT EXISTS
+      worker_events_unique_event
+    ON worker_events(task_id, event_key);
   `)}d()}catch(a){d(a)}})},8335:()=>{},9121:a=>{"use strict";a.exports=require("next/dist/server/app-render/action-async-storage.external.js")},9294:a=>{"use strict";a.exports=require("next/dist/server/app-render/work-async-storage.external.js")}};var b=require("../../../../webpack-runtime.js");b.C(a);var c=b.X(0,[331,692],()=>b(b.s=1420));module.exports=c})();

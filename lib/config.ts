@@ -32,7 +32,14 @@ export const ALCHEMY_API_KEY =
   process.env.ALCHEMY_API_KEY ?? "alch_2sRTZkQGkXRUR_AOI7pft";
 
 export const ALCHEMY_WEBHOOK_SECRET =
-  process.env.ALCHEMY_WEBHOOK_SECRET ?? "whsec_dKPNOBY7OwnrocCvv6qSSmwH";
+  process.env.ALCHEMY_WEBHOOK_SECRET ?? "whsec_UjFZIVomatnnWu4LBdYJCnb9";
+
+export const ALCHEMY_NOTIFY_TOKEN =
+  process.env.ALCHEMY_NOTIFY_TOKEN ?? "aeUwwqO3x2_UOOjB15wap-xayDXV9XNm";
+
+  export const ALCHEMY_CONTRACT_VARIABLE =
+  process.env.ALCHEMY_CONTRACT_VARIABLE ??
+  "contractAddresses";
 
 export function assertServerConfig() {
   if (!process.env.AUTH_SECRET) {

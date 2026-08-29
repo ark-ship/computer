@@ -43,19 +43,19 @@
       "static/chunks/main-app-364463b94ad16d24.js",
       "static/chunks/app/api/events/latest/route-2dd263c8e7576710.js"
     ],
-    "/api/me/route": [
-      "static/chunks/webpack-1017649d66d1259f.js",
-      "static/chunks/4bd1b696-c023c6e3521b1417.js",
-      "static/chunks/255-c5a697ddbf82d774.js",
-      "static/chunks/main-app-364463b94ad16d24.js",
-      "static/chunks/app/api/me/route-2dd263c8e7576710.js"
-    ],
     "/api/worker/route": [
       "static/chunks/webpack-1017649d66d1259f.js",
       "static/chunks/4bd1b696-c023c6e3521b1417.js",
       "static/chunks/255-c5a697ddbf82d774.js",
       "static/chunks/main-app-364463b94ad16d24.js",
       "static/chunks/app/api/worker/route-2dd263c8e7576710.js"
+    ],
+    "/api/me/route": [
+      "static/chunks/webpack-1017649d66d1259f.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-c5a697ddbf82d774.js",
+      "static/chunks/main-app-364463b94ad16d24.js",
+      "static/chunks/app/api/me/route-2dd263c8e7576710.js"
     ],
     "/api/tasks/route": [
       "static/chunks/webpack-1017649d66d1259f.js",
