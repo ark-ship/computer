@@ -302,6 +302,96 @@ export default function Dashboard() {
   }, []);
 
   /* ==========================================================
+     REALTIME SIGNAL STREAM
+  ========================================================== */
+
+  useEffect(() => {
+    if (!wallet) {
+      return;
+    }
+
+    const stream = new EventSource(
+      `/api/events/stream?wallet=${encodeURIComponent(
+        wallet
+      )}`
+    );
+
+    stream.onmessage = (message) => {
+      try {
+        const data = JSON.parse(
+          message.data
+        );
+
+        /*
+         * Connection event / heartbeat
+         */
+        if (
+          data?.type !== "event" ||
+          !data?.event
+        ) {
+          return;
+        }
+
+        const incomingEvent =
+          data.event as EventItem;
+
+        setEvents((current) => {
+          const alreadyExists =
+            current.some(
+              (event) =>
+                event.id ===
+                incomingEvent.id
+            );
+
+          if (alreadyExists) {
+            return current;
+          }
+
+          return [
+            incomingEvent,
+            ...current,
+          ];
+        });
+
+        /*
+         * Refresh task metadata:
+         *
+         * last_checked_at
+         * last_triggered_at
+         * worker state
+         */
+        loadAccount().catch(
+          (accountError) => {
+            console.error(
+              "Realtime account refresh failed:",
+              accountError
+            );
+          }
+        );
+      } catch (streamError) {
+        console.error(
+          "SSE message parse failed:",
+          streamError
+        );
+      }
+    };
+
+    stream.onerror = () => {
+      /*
+       * Browser's EventSource automatically
+       * attempts to reconnect.
+       */
+      console.warn(
+        "Signal stream disconnected. Reconnecting..."
+      );
+    };
+
+    return () => {
+      stream.close();
+    };
+  }, [wallet]);
+
+  /* ==========================================================
      ROBINHOOD NETWORK
   ========================================================== */
 
@@ -514,6 +604,7 @@ export default function Dashboard() {
 
     setWallet(data.wallet ?? "");
     setBalance(data.balance ?? "0");
+
     setTasks(data.tasks ?? []);
     setEvents(data.events ?? []);
 
@@ -534,7 +625,10 @@ export default function Dashboard() {
         return current;
       }
 
-      return ownedNFTs[0] ?? null;
+      return (
+        ownedNFTs[0] ??
+        null
+      );
     });
   }
 
@@ -583,7 +677,10 @@ export default function Dashboard() {
           return current;
         }
 
-        return ownedNFTs[0] ?? null;
+        return (
+          ownedNFTs[0] ??
+          null
+        );
       });
     } catch (err) {
       console.error(
@@ -810,10 +907,21 @@ export default function Dashboard() {
       .then((data) => {
         if (!data) return;
 
-        setWallet(data.wallet ?? "");
-        setBalance(data.balance ?? "0");
-        setTasks(data.tasks ?? []);
-        setEvents(data.events ?? []);
+        setWallet(
+          data.wallet ?? ""
+        );
+
+        setBalance(
+          data.balance ?? "0"
+        );
+
+        setTasks(
+          data.tasks ?? []
+        );
+
+        setEvents(
+          data.events ?? []
+        );
 
         const ownedNFTs =
           normalizeNFTs(data);
@@ -827,10 +935,10 @@ export default function Dashboard() {
         if (data.wallet) {
           loadNFTs(
             data.wallet
-          ).catch((error) => {
+          ).catch((loadError) => {
             console.error(
               "NFT session loading failed:",
-              error
+              loadError
             );
           });
         }
@@ -991,16 +1099,16 @@ export default function Dashboard() {
           </div>
 
 
-          {/* ================================================
-              SELECTED NFT
-          ================================================= */}
+          {/* SELECTED NFT */}
 
           <div className="computer-mini">
 
             {selectedNFT?.image_url ? (
 
               <img
-                src={selectedNFT.image_url}
+                src={
+                  selectedNFT.image_url
+                }
                 alt={
                   selectedNFT.name ??
                   "Super Computer"
@@ -1023,9 +1131,7 @@ export default function Dashboard() {
           </div>
 
 
-          {/* ================================================
-              SELECTED NFT NAME
-          ================================================= */}
+          {/* SELECTED NAME */}
 
           {selectedNFT && (
 
@@ -1045,9 +1151,7 @@ export default function Dashboard() {
           )}
 
 
-          {/* ================================================
-              NFT SELECTOR
-          ================================================= */}
+          {/* NFT SELECTOR */}
 
           {nfts.length > 0 && (
 
@@ -1067,7 +1171,9 @@ export default function Dashboard() {
 
                   return (
                     <button
-                      key={nft.identifier}
+                      key={
+                        nft.identifier
+                      }
                       className={
                         selected
                           ? "nft-thumb selected"
@@ -1087,7 +1193,9 @@ export default function Dashboard() {
                       {nft.image_url ? (
 
                         <img
-                          src={nft.image_url}
+                          src={
+                            nft.image_url
+                          }
                           alt={
                             nft.name ??
                             "Computer"
@@ -1114,9 +1222,7 @@ export default function Dashboard() {
           )}
 
 
-          {/* ================================================
-              UNIT
-          ================================================= */}
+          {/* UNIT */}
 
           <div className="sidebar-unit">
 
@@ -1138,9 +1244,7 @@ export default function Dashboard() {
           </div>
 
 
-          {/* ================================================
-              MENU
-          ================================================= */}
+          {/* MENU */}
 
           <nav className="os-menu">
 
@@ -1154,11 +1258,13 @@ export default function Dashboard() {
                 setTab("computer")
               }
             >
+
               <span>
                 ▣
               </span>
 
               COMPUTER
+
             </button>
 
 
@@ -1172,11 +1278,13 @@ export default function Dashboard() {
                 setTab("signals")
               }
             >
+
               <span>
                 ◈
               </span>
 
               SIGNAL LOG
+
             </button>
 
 
@@ -1190,6 +1298,7 @@ export default function Dashboard() {
                 setTab("ai")
               }
             >
+
               <span>
                 ✦
               </span>
@@ -1199,51 +1308,100 @@ export default function Dashboard() {
               <small>
                 SOON
               </small>
+
             </button>
 
             <div className="coming-soon-menu">
 
-  <div className="coming-soon-title">
-    <span>SYSTEMS</span>
-    <small>SOON</small>
-  </div>
+              <div className="coming-soon-title">
 
-  <div className="coming-soon-items">
+                <span>
+                  SYSTEMS
+                </span>
 
-    <div className="coming-soon-item">
-      <span>↕</span>
-      <strong>TRADE</strong>
-      <small>SOON</small>
-    </div>
+                <small>
+                  SOON
+                </small>
 
-    <div className="coming-soon-item">
-      <span>◈</span>
-      <strong>ANALYTICS</strong>
-      <small>SOON</small>
-    </div>
+              </div>
 
-    <div className="coming-soon-item">
-      <span>◆</span>
-      <strong>MARKET</strong>
-      <small>SOON</small>
-    </div>
+              <div className="coming-soon-items">
 
-    <div className="coming-soon-item">
-      <span>+</span>
-      <strong>MORE</strong>
-      <small>SOON</small>
-    </div>
+                <div className="coming-soon-item">
 
-  </div>
+                  <span>
+                    ↕
+                  </span>
 
-</div>
+                  <strong>
+                    TRADE
+                  </strong>
+
+                  <small>
+                    SOON
+                  </small>
+
+                </div>
+
+
+                <div className="coming-soon-item">
+
+                  <span>
+                    ◈
+                  </span>
+
+                  <strong>
+                    ANALYTICS
+                  </strong>
+
+                  <small>
+                    SOON
+                  </small>
+
+                </div>
+
+
+                <div className="coming-soon-item">
+
+                  <span>
+                    ◆
+                  </span>
+
+                  <strong>
+                    MARKET
+                  </strong>
+
+                  <small>
+                    SOON
+                  </small>
+
+                </div>
+
+
+                <div className="coming-soon-item">
+
+                  <span>
+                    +
+                  </span>
+
+                  <strong>
+                    MORE
+                  </strong>
+
+                  <small>
+                    SOON
+                  </small>
+
+                </div>
+
+              </div>
+
+            </div>
 
           </nav>
 
 
-          {/* ================================================
-              STATS
-          ================================================= */}
+          {/* STATS */}
 
           <div className="sidebar-bottom">
 
@@ -1282,9 +1440,11 @@ export default function Dashboard() {
               </span>
 
               <strong className="lime">
+
                 {wallet
                   ? activeCount
                   : "0"}
+
               </strong>
 
             </div>
@@ -1345,9 +1505,7 @@ export default function Dashboard() {
             <div className="window-body">
 
 
-              {/* ==========================================
-                  WORKER DISPLAY
-              ========================================== */}
+              {/* WORKER DISPLAY */}
 
               <section className="worker-display">
 
@@ -1446,9 +1604,7 @@ export default function Dashboard() {
               </section>
 
 
-              {/* ==========================================
-                  NEW ASSIGNMENT
-              ========================================== */}
+              {/* ASSIGNMENT */}
 
               <section className="assignment">
 
@@ -1596,9 +1752,11 @@ export default function Dashboard() {
                         taskLoading
                       }
                     >
+
                       {taskLoading
                         ? "BOOTING WORKER..."
                         : "▶ START WORKER"}
+
                     </button>
 
 
@@ -1622,9 +1780,7 @@ export default function Dashboard() {
               </section>
 
 
-              {/* ==========================================
-                  ACTIVE WORKERS
-              ========================================== */}
+              {/* ACTIVE WORKERS */}
 
               <section className="worker-list">
 
@@ -1679,19 +1835,23 @@ export default function Dashboard() {
                         >
 
                           <div className="row-number">
+
                             {String(
                               index + 1
                             ).padStart(
                               2,
                               "0"
                             )}
+
                           </div>
 
 
                           <div className="row-icon">
+
                             {taskIcon(
                               task.type
                             )}
+
                           </div>
 
 
@@ -1711,9 +1871,11 @@ export default function Dashboard() {
                                     : "status-paused"
                                 }
                               >
+
                                 {task.active
                                   ? "● WORKING"
                                   : "○ PAUSED"}
+
                               </span>
 
                             </div>
@@ -1759,9 +1921,11 @@ export default function Dashboard() {
                                 )
                               }
                             >
+
                               {task.active
                                 ? "II"
                                 : "▶"}
+
                             </button>
 
 
