@@ -1,78 +1,169 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, initDb } from "@/lib/db";
+import { ethers } from "ethers";
+
+import {
+  authRequired,
+} from "@/lib/auth";
+
+import {
+  db,
+  initDb,
+} from "@/lib/db";
+
+import {
+  getAccountNFTs,
+} from "@/lib/opensea";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+type TaskRow = {
+  id: string;
+  type: "wallet" | "floor" | "mint";
+  target: string;
+  condition: string;
+  active: boolean;
+  last_checked_at: string | null;
+  last_triggered_at: string | null;
+  created_at: string;
+};
+
+type EventRow = {
+  id: string;
+  task_id: string;
+  message: string;
+  created_at: string;
+};
+
+export async function GET(
+  req: NextRequest
+) {
   try {
-    const wallet = req.nextUrl.searchParams
-      .get("wallet")
-      ?.toLowerCase();
-
-    const after = req.nextUrl.searchParams.get(
-      "after"
-    );
-
-    if (!wallet) {
-      return NextResponse.json(
-        { error: "Wallet is required." },
-        { status: 400 }
-      );
-    }
+    /*
+     * Read authenticated wallet
+     * from sc_session cookie.
+     */
+    const wallet =
+      authRequired(req);
 
     await initDb();
 
-    const events = after
-      ? await db<{
-          id: string;
-          task_id: string;
-          message: string;
-          created_at: string;
-        }>(
-          `
-          SELECT
-            id,
-            task_id,
-            message,
-            created_at
-          FROM worker_events
-          WHERE LOWER(owner) = LOWER($1)
-            AND created_at > (
-              SELECT created_at
-              FROM worker_events
-              WHERE id = $2
-              LIMIT 1
-            )
-          ORDER BY created_at ASC
-          LIMIT 50
-          `,
-          [wallet, after]
-        )
-      : await db<{
-          id: string;
-          task_id: string;
-          message: string;
-          created_at: string;
-        }>(
-          `
-          SELECT
-            id,
-            task_id,
-            message,
-            created_at
-          FROM worker_events
-          WHERE LOWER(owner) = LOWER($1)
-          ORDER BY created_at DESC
-          LIMIT 20
-          `,
-          [wallet]
+    /*
+     * Load worker tasks.
+     */
+    const tasks =
+      await db<TaskRow>(
+        `
+        SELECT
+          id,
+          type,
+          target,
+          condition,
+          active,
+          last_checked_at,
+          last_triggered_at,
+          created_at
+        FROM worker_tasks
+        WHERE LOWER(owner) = LOWER($1)
+        ORDER BY created_at DESC
+        `,
+        [wallet]
+      );
+
+    /*
+     * Load signal events.
+     */
+    const events =
+      await db<EventRow>(
+        `
+        SELECT
+          id,
+          task_id,
+          message,
+          created_at
+        FROM worker_events
+        WHERE LOWER(owner) = LOWER($1)
+        ORDER BY created_at DESC
+        LIMIT 100
+        `,
+        [wallet]
+      );
+
+    /*
+     * Get native ETH balance.
+     */
+    let balance = "0";
+
+    try {
+      const provider =
+        new ethers.JsonRpcProvider(
+          process.env.NEXT_PUBLIC_RPC_URL ||
+            "https://rpc.mainnet.chain.robinhood.com"
         );
 
+      const rawBalance =
+        await provider.getBalance(
+          wallet
+        );
+
+      balance =
+        ethers.formatEther(
+          rawBalance
+        );
+    } catch (balanceError) {
+      console.error(
+        "Balance loading failed:",
+        balanceError
+      );
+    }
+
+    /*
+     * Load Super Computers owned
+     * by the authenticated wallet.
+     */
+    let nfts: unknown = [];
+
+    try {
+      nfts =
+        (await getAccountNFTs(
+          wallet
+        )) ?? [];
+    } catch (nftError) {
+      console.error(
+        "NFT loading failed:",
+        nftError
+      );
+    }
+
+    /*
+     * If the wallet has no NFTs,
+     * the dashboard can still load.
+     */
+    const nftItems =
+      (nfts as any)?.nfts ??
+      (nfts as any)?.items ??
+      (Array.isArray(nfts)
+        ? nfts
+        : []);
+
+    /*
+     * The frontend expects this shape:
+     *
+     * {
+     *   wallet,
+     *   balance,
+     *   tasks,
+     *   events,
+     *   nfts
+     * }
+     */
     return NextResponse.json(
       {
-        ok: true,
+        wallet,
+        balance,
+        tasks,
         events,
+        nfts: nftItems,
       },
       {
         headers: {
@@ -82,20 +173,36 @@ export async function GET(req: NextRequest) {
       }
     );
   } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "UNAUTHORIZED"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "UNAUTHORIZED",
+        },
+        {
+          status: 401,
+        }
+      );
+    }
+
     console.error(
-      "Latest events error:",
+      "ME endpoint failed:",
       error
     );
 
     return NextResponse.json(
       {
-        ok: false,
         error:
           error instanceof Error
             ? error.message
-            : "Unable to load events.",
+            : "ACCOUNT LOAD FAILED",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }

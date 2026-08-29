@@ -3,9 +3,9 @@
   "/api/auth/logout/route": "/api/auth/logout",
   "/api/auth/challenge/route": "/api/auth/challenge",
   "/api/auth/verify/route": "/api/auth/verify",
+  "/api/events/latest/route": "/api/events/latest",
   "/api/me/route": "/api/me",
   "/api/worker/route": "/api/worker",
-  "/api/events/latest/route": "/api/events/latest",
   "/api/tasks/route": "/api/tasks",
   "/api/webhooks/alchemy/route": "/api/webhooks/alchemy",
   "/page": "/"
