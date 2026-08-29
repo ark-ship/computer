@@ -70,9 +70,12 @@ function formatTime(value?: string | null) {
     return "--:--";
   }
 
-  return date.toLocaleTimeString([], {
+  return date.toLocaleTimeString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZone: "UTC",
   });
 }
 
@@ -86,6 +89,9 @@ function taskLabel(type: TaskType) {
 
     case "mint":
       return "MINT";
+
+    default:
+      return "UNKNOWN";
   }
 }
 
@@ -99,12 +105,15 @@ function taskIcon(type: TaskType) {
 
     case "mint":
       return "M";
+
+    default:
+      return "?";
   }
 }
 
 function normalizeImageUrl(
   value?: string | null
-) {
+): string | null {
   if (!value) {
     return null;
   }
@@ -179,9 +188,7 @@ function normalizeNFTs(data: any): NFTItem[] {
       return {
         identifier,
         name,
-        image_url: normalizeImageUrl(
-          image
-        ),
+        image_url: normalizeImageUrl(image),
         collection,
       };
     })
@@ -212,7 +219,9 @@ export default function Dashboard() {
   const [condition, setCondition] =
     useState("");
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] =
+    useState(false);
+
   const [taskLoading, setTaskLoading] =
     useState(false);
 
@@ -221,11 +230,15 @@ export default function Dashboard() {
   const [networkReady, setNetworkReady] =
     useState(false);
 
-  const [booted, setBooted] = useState(false);
+  const [booted, setBooted] =
+    useState(false);
 
   const [tab, setTab] = useState<
     "computer" | "signals" | "ai"
   >("computer");
+
+  const [utcTime, setUtcTime] =
+    useState("");
 
   const activeCount = useMemo(
     () =>
@@ -242,6 +255,10 @@ export default function Dashboard() {
       ? "WORKING"
       : "IDLE";
 
+  /* ==========================================================
+     BOOT
+  ========================================================== */
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setBooted(true);
@@ -251,6 +268,42 @@ export default function Dashboard() {
       window.clearTimeout(timer);
     };
   }, []);
+
+  /* ==========================================================
+     UTC CLOCK
+  ========================================================== */
+
+  useEffect(() => {
+    const updateClock = () => {
+      setUtcTime(
+        new Date().toLocaleTimeString(
+          "en-GB",
+          {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false,
+            timeZone: "UTC",
+          }
+        )
+      );
+    };
+
+    updateClock();
+
+    const interval = window.setInterval(
+      updateClock,
+      1000
+    );
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  /* ==========================================================
+     ROBINHOOD NETWORK
+  ========================================================== */
 
   async function ensureRobinhoodNetwork(
     provider: ethers.BrowserProvider
@@ -314,6 +367,10 @@ export default function Dashboard() {
     setNetworkReady(true);
   }
 
+  /* ==========================================================
+     CONNECT WALLET
+  ========================================================== */
+
   async function connectWallet() {
     setError("");
 
@@ -342,7 +399,8 @@ export default function Dashboard() {
           []
         );
 
-      const address = accounts?.[0];
+      const address =
+        accounts?.[0];
 
       if (!address) {
         throw new Error(
@@ -355,10 +413,12 @@ export default function Dashboard() {
           "/api/auth/challenge",
           {
             method: "POST",
+
             headers: {
               "content-type":
                 "application/json",
             },
+
             body: JSON.stringify({
               address,
             }),
@@ -368,9 +428,7 @@ export default function Dashboard() {
       const challenge =
         await challengeResponse.json();
 
-      if (
-        !challengeResponse.ok
-      ) {
+      if (!challengeResponse.ok) {
         throw new Error(
           challenge.error ||
             "AUTH CHALLENGE FAILED"
@@ -390,10 +448,12 @@ export default function Dashboard() {
           "/api/auth/verify",
           {
             method: "POST",
+
             headers: {
               "content-type":
                 "application/json",
             },
+
             body: JSON.stringify({
               address,
               message:
@@ -426,11 +486,18 @@ export default function Dashboard() {
     }
   }
 
+  /* ==========================================================
+     LOAD ACCOUNT
+  ========================================================== */
+
   async function loadAccount() {
     const response =
-      await fetch("/api/me", {
-        cache: "no-store",
-      });
+      await fetch(
+        "/api/me",
+        {
+          cache: "no-store",
+        }
+      );
 
     const data =
       await response.json();
@@ -470,6 +537,10 @@ export default function Dashboard() {
       return ownedNFTs[0] ?? null;
     });
   }
+
+  /* ==========================================================
+     LOAD NFTS
+  ========================================================== */
 
   async function loadNFTs(
     address: string
@@ -522,6 +593,10 @@ export default function Dashboard() {
     }
   }
 
+  /* ==========================================================
+     DISCONNECT
+  ========================================================== */
+
   async function disconnect() {
     try {
       await fetch(
@@ -544,6 +619,10 @@ export default function Dashboard() {
       setError("");
     }
   }
+
+  /* ==========================================================
+     CREATE WORKER
+  ========================================================== */
 
   async function startWorker() {
     setError("");
@@ -580,14 +659,18 @@ export default function Dashboard() {
           "/api/tasks",
           {
             method: "POST",
+
             headers: {
               "content-type":
                 "application/json",
             },
+
             body: JSON.stringify({
               type: taskType,
+
               target:
                 target.trim(),
+
               condition:
                 condition.trim(),
             }),
@@ -619,6 +702,10 @@ export default function Dashboard() {
     }
   }
 
+  /* ==========================================================
+     TOGGLE TASK
+  ========================================================== */
+
   async function toggleTask(
     task: Task
   ) {
@@ -630,12 +717,15 @@ export default function Dashboard() {
           "/api/tasks",
           {
             method: "PATCH",
+
             headers: {
               "content-type":
                 "application/json",
             },
+
             body: JSON.stringify({
               id: task.id,
+
               active:
                 !task.active,
             }),
@@ -661,6 +751,10 @@ export default function Dashboard() {
       );
     }
   }
+
+  /* ==========================================================
+     DELETE TASK
+  ========================================================== */
 
   async function deleteTask(
     id: string
@@ -697,6 +791,10 @@ export default function Dashboard() {
       );
     }
   }
+
+  /* ==========================================================
+     INITIAL SESSION
+  ========================================================== */
 
   useEffect(() => {
     fetch("/api/me", {
@@ -740,9 +838,14 @@ export default function Dashboard() {
       .catch(() => {});
   }, []);
 
+  /* ==========================================================
+     BOOT SCREEN
+  ========================================================== */
+
   if (!booted) {
     return (
       <div className="boot-screen">
+
         <div className="boot-box">
 
           <div className="boot-logo">
@@ -771,6 +874,7 @@ export default function Dashboard() {
           </div>
 
         </div>
+
       </div>
     );
   }
@@ -829,7 +933,7 @@ export default function Dashboard() {
           </span>
 
           <span className="top-value">
-            RH / 4663
+            ROBINHOOD
           </span>
 
         </div>
@@ -991,11 +1095,16 @@ export default function Dashboard() {
                         />
 
                       ) : (
-                        <span>?</span>
+
+                        <span>
+                          ?
+                        </span>
+
                       )}
 
                     </button>
                   );
+
                 })}
 
               </div>
@@ -1019,7 +1128,10 @@ export default function Dashboard() {
               {selectedNFT
                 ? `SC-${String(
                     selectedNFT.identifier
-                  ).padStart(4, "0")}`
+                  ).padStart(
+                    4,
+                    "0"
+                  )}`
                 : "SC----"}
             </strong>
 
@@ -1042,7 +1154,10 @@ export default function Dashboard() {
                 setTab("computer")
               }
             >
-              <span>▣</span>
+              <span>
+                ▣
+              </span>
+
               COMPUTER
             </button>
 
@@ -1057,7 +1172,10 @@ export default function Dashboard() {
                 setTab("signals")
               }
             >
-              <span>◈</span>
+              <span>
+                ◈
+              </span>
+
               SIGNAL LOG
             </button>
 
@@ -1072,12 +1190,14 @@ export default function Dashboard() {
                 setTab("ai")
               }
             >
-              <span>✦</span>
+              <span>
+                ✦
+              </span>
 
               AI
 
               <small>
-                
+                SOON
               </small>
             </button>
 
@@ -1162,9 +1282,17 @@ export default function Dashboard() {
 
             <div className="window-tools">
 
-              <span>_</span>
-              <span>□</span>
-              <span>×</span>
+              <span>
+                _
+              </span>
+
+              <span>
+                □
+              </span>
+
+              <span>
+                ×
+              </span>
 
             </div>
 
@@ -1179,6 +1307,10 @@ export default function Dashboard() {
 
             <div className="window-body">
 
+
+              {/* ==========================================
+                  WORKER DISPLAY
+              ========================================== */}
 
               <section className="worker-display">
 
@@ -1197,7 +1329,7 @@ export default function Dashboard() {
                   </div>
 
                   <div className="display-time">
-                    {new Date().toLocaleTimeString()}
+                    {utcTime || "--:--:--"} UTC
                   </div>
 
                 </div>
@@ -1277,9 +1409,9 @@ export default function Dashboard() {
               </section>
 
 
-              {/* ==================================================
-                  ASSIGNMENT
-              ================================================== */}
+              {/* ==========================================
+                  NEW ASSIGNMENT
+              ========================================== */}
 
               <section className="assignment">
 
@@ -1299,6 +1431,7 @@ export default function Dashboard() {
 
 
                 <div className="assignment-grid">
+
 
                   <div className="job-picker">
 
@@ -1452,9 +1585,9 @@ export default function Dashboard() {
               </section>
 
 
-              {/* ==================================================
+              {/* ==========================================
                   ACTIVE WORKERS
-              ================================================== */}
+              ========================================== */}
 
               <section className="worker-list">
 
@@ -1509,23 +1642,19 @@ export default function Dashboard() {
                         >
 
                           <div className="row-number">
-
                             {String(
                               index + 1
                             ).padStart(
                               2,
                               "0"
                             )}
-
                           </div>
 
 
                           <div className="row-icon">
-
                             {taskIcon(
                               task.type
                             )}
-
                           </div>
 
 
@@ -1712,7 +1841,7 @@ export default function Dashboard() {
           ) : (
 
             /* ==================================================
-               AI SOON
+               AI SYSTEM
             ================================================== */
 
             <div className="ai-soon-window">
@@ -1732,39 +1861,47 @@ export default function Dashboard() {
 
               <div className="ai-soon-content">
 
-  <div className="ai-symbol">
-    ✦
-  </div>
+                <div className="ai-symbol">
+                  ✦
+                </div>
 
-  <div className="ai-title">
-    AI WORKER
-  </div>
 
-  <div className="ai-status">
-    SYSTEM UNDER DEVELOPMENT
-  </div>
+                <div className="ai-title">
+                  AI WORKER
+                </div>
 
-  <p>
-    Your Computer will soon be able
-    to use AI assisted workers.
-  </p>
 
-  <div className="ai-progress">
-    <span />
-    <span />
-    <span />
-    <span />
-    <span />
-    <span />
-    <span />
-    <span />
-  </div>
+                <div className="ai-status">
+                  SYSTEM UNDER DEVELOPMENT
+                </div>
 
-  <div className="ai-soon-label">
-    COMING SOON
-  </div>
 
-</div>
+                <p>
+                  Your Computer will soon
+                  be able to use AI assisted
+                  workers.
+                </p>
+
+
+                <div className="ai-progress">
+
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+
+                </div>
+
+
+                <div className="ai-soon-label">
+                  COMING SOON
+                </div>
+
+              </div>
 
             </div>
 
