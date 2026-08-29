@@ -86,7 +86,7 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 // Validate ../../app/api/event/stream/route.ts
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/event/stream">> = Specific
-  const handler = {} as typeof import("../../app/api/event/stream/route.js")
+  const handler = {} as typeof import("../../app/api/events/stream/route.js")
   type __Check = __IsExpected<typeof handler>
   // @ts-ignore
   type __Unused = __Check

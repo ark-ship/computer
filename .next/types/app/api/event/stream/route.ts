@@ -1,8 +1,8 @@
 // File: D:\coding\super-computers-real\super-computers-site\app\api\event\stream\route.ts
-import * as entry from '../../../../../../app/api/event/stream/route.js'
+import * as entry from '../../../../../../app/api/events/stream/route.js'
 import type { NextRequest } from 'next/server.js'
 
-type TEntry = typeof import('../../../../../../app/api/event/stream/route.js')
+type TEntry = typeof import('../../../../../../app/api/events/stream/route.js')
 
 type SegmentParams<T extends Object = any> = T extends Record<string, any>
   ? { [K in keyof T]: T[K] extends string ? string | string[] | undefined : never }
