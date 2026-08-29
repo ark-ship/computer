@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/auth/challenge": {},
+    "/api/auth/verify": {},
+    "/api/me": {},
+    "/api/tasks": {},
+    "/api/worker": {}
+  }
+}
