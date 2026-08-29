@@ -99,21 +99,33 @@ async function runFloorTask(task: TaskRow) {
 }
 
 async function runMintTask(task: TaskRow) {
-  const data = await getCollectionEvents(task.target, "mint");
-  const latest = data?.asset_events?.[0] ?? data?.events?.[0];
+  const data = await getCollectionEvents(
+    task.target,
+    "mint"
+  );
 
-  if (!latest) return null;
+  const latest =
+    data?.asset_events?.[0] ??
+    data?.events?.[0];
+
+  if (!latest) {
+    return null;
+  }
 
   const identifier =
+    latest?.id ??
     latest?.transaction?.hash ??
-    latest?.event_timestamp ??
-    latest?.id;
+    `${latest?.nft?.identifier ?? "unknown"}:${latest?.event_timestamp ?? "unknown"}`;
 
-  if (!identifier) return null;
+  if (!identifier) {
+    return null;
+  }
 
   const eventKey = `mint:${String(identifier)}`;
 
-  if (eventKey === task.last_event_key) return null;
+  if (eventKey === task.last_event_key) {
+    return null;
+  }
 
   const message =
     `🖥️ SUPER COMPUTER ALERT\n\n` +

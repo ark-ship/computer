@@ -28,6 +28,12 @@ export const OPENSEA_API_KEY =
 export const BLOCKSCOUT_API_KEY =
   process.env.BLOCKSCOUT_API_KEY ?? "";
 
+export const ALCHEMY_API_KEY =
+  process.env.ALCHEMY_API_KEY ?? "alch_2sRTZkQGkXRUR_AOI7pft";
+
+export const ALCHEMY_WEBHOOK_SECRET =
+  process.env.ALCHEMY_WEBHOOK_SECRET ?? "whsec_dKPNOBY7OwnrocCvv6qSSmwH";
+
 export function assertServerConfig() {
   if (!process.env.AUTH_SECRET) {
     throw new Error("AUTH_SECRET is missing");
