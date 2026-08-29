@@ -1789,10 +1789,6 @@ export default function Dashboard() {
           5,555 UNITS
         </span>
 
-        <span>
-          ROBINHOOD / 4663
-        </span>
-
       </footer>
 
     </div>
