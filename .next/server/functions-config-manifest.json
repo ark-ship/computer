@@ -2,11 +2,12 @@
   "version": 1,
   "functions": {
     "/api/auth/challenge": {},
-    "/api/events/latest": {},
     "/api/auth/verify": {},
+    "/api/events/latest": {},
     "/api/me": {},
     "/api/tasks": {},
     "/api/worker": {},
+    "/api/webhooks/alchemy-multi": {},
     "/api/webhooks/alchemy": {}
   }
 }

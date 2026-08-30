@@ -210,11 +210,11 @@ export default function Dashboard() {
   const [balance, setBalance] = useState("0");
 
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [events, setEvents] = useState<EventItem[]>(
-    []
-  );
+  const [events, setEvents] =
+    useState<EventItem[]>([]);
 
-  const [nfts, setNfts] = useState<NFTItem[]>([]);
+  const [nfts, setNfts] =
+    useState<NFTItem[]>([]);
 
   const [selectedNFT, setSelectedNFT] =
     useState<NFTItem | null>(null);
@@ -247,8 +247,8 @@ export default function Dashboard() {
   const [utcTime, setUtcTime] =
     useState("");
 
-  const lastEventIdRef =
-    useRef("");
+  const lastEventIdsRef =
+    useRef<Set<string>>(new Set());
 
   const activeCount = useMemo(
     () =>
@@ -301,13 +301,16 @@ export default function Dashboard() {
 
     updateClock();
 
-    const interval = window.setInterval(
-      updateClock,
-      1000
-    );
+    const interval =
+      window.setInterval(
+        updateClock,
+        1000
+      );
 
     return () => {
-      window.clearInterval(interval);
+      window.clearInterval(
+        interval
+      );
     };
   }, []);
 
@@ -349,9 +352,20 @@ export default function Dashboard() {
       data.tasks ?? []
     );
 
-    setEvents(
-      data.events ?? []
-    );
+    const accountEvents =
+      Array.isArray(data.events)
+        ? data.events
+        : [];
+
+    setEvents(accountEvents);
+
+    lastEventIdsRef.current =
+      new Set(
+        accountEvents.map(
+          (event: EventItem) =>
+            event.id
+        )
+      );
 
     const ownedNFTs =
       normalizeNFTs(data);
@@ -440,84 +454,127 @@ export default function Dashboard() {
   ========================================================== */
 
   useEffect(() => {
-  if (!wallet) {
-    return;
-  }
+    if (!wallet) {
+      return;
+    }
 
-  let stopped = false;
+    let stopped = false;
 
-  const loadLatestEvents =
-    async () => {
-      try {
-        const lastEventId =
-          lastEventIdRef.current;
-
-        const url = lastEventId
-          ? `/api/events/latest?wallet=${encodeURIComponent(
-              wallet
-            )}&after=${encodeURIComponent(
-              lastEventId
-            )}`
-          : `/api/events/latest?wallet=${encodeURIComponent(
-              wallet
-            )}`;
-
-        const response =
-          await fetch(url, {
-            cache: "no-store",
-          });
-
-        if (!response.ok) {
+    const checkEvents =
+      async () => {
+        if (stopped) {
           return;
         }
 
-        const data =
-          await response.json();
-
-        if (
-          stopped ||
-          !Array.isArray(data.events)
-        ) {
-          return;
-        }
-
-        if (!lastEventId) {
-          setEvents(data.events);
-
-          if (
-            data.events.length > 0
-          ) {
-            lastEventIdRef.current =
-              data.events[0].id;
-          }
-
-          return;
-        }
-
-        if (
-          data.events.length === 0
-        ) {
-          return;
-        }
-
-        lastEventIdRef.current =
-          data.events[
-            data.events.length - 1
-          ].id;
-
-        setEvents((current) => {
-          const existingIds =
-            new Set(
-              current.map(
-                (event) =>
-                  event.id
-              )
+        try {
+          const response =
+            await fetch(
+              `/api/events/latest?wallet=${encodeURIComponent(
+                wallet
+              )}`,
+              {
+                cache: "no-store",
+              }
             );
 
+          const contentType =
+            response.headers.get(
+              "content-type"
+            ) || "";
+
+          const text =
+            await response.text();
+
+          if (!response.ok) {
+            console.error(
+              "EVENT API ERROR:",
+              response.status,
+              text.slice(0, 500)
+            );
+
+            return;
+          }
+
+          if (
+            !contentType.includes(
+              "application/json"
+            )
+          ) {
+            console.error(
+              "EVENT API RETURNED NON-JSON:",
+              {
+                status:
+                  response.status,
+                contentType,
+                body:
+                  text.slice(
+                    0,
+                    500
+                  ),
+              }
+            );
+
+            return;
+          }
+
+          let data: {
+            ok?: boolean;
+            events?: EventItem[];
+            error?: string;
+          };
+
+          try {
+            data =
+              JSON.parse(text);
+          } catch (parseError) {
+            console.error(
+              "EVENT JSON PARSE ERROR:",
+              parseError
+            );
+
+            return;
+          }
+
+          if (
+            !Array.isArray(
+              data.events
+            )
+          ) {
+            return;
+          }
+
+          const incoming =
+            data.events;
+
+          /*
+           * Initial request:
+           * show all currently stored events.
+           */
+          if (
+            lastEventIdsRef.current
+              .size === 0
+          ) {
+            setEvents(incoming);
+
+            lastEventIdsRef.current =
+              new Set(
+                incoming.map(
+                  (event) =>
+                    event.id
+                )
+              );
+
+            return;
+          }
+
+          /*
+           * Find only events
+           * that the browser has not seen.
+           */
           const newEvents =
-            data.events.filter(
-              (event: EventItem) =>
-                !existingIds.has(
+            incoming.filter(
+              (event) =>
+                !lastEventIdsRef.current.has(
                   event.id
                 )
             );
@@ -525,46 +582,119 @@ export default function Dashboard() {
           if (
             newEvents.length === 0
           ) {
-            return current;
+            return;
           }
 
-          return [
-            ...newEvents.reverse(),
-            ...current,
-          ];
-        });
-
-        loadAccount().catch(
-          (accountError) => {
-            console.error(
-              "Realtime account refresh failed:",
-              accountError
+          /*
+           * Remember new event IDs.
+           */
+          for (const event of newEvents) {
+            lastEventIdsRef.current.add(
+              event.id
             );
           }
-        );
-      } catch (error) {
-        console.error(
-          "Realtime event check failed:",
-          error
-        );
-      }
+
+          /*
+           * Put newest events at top.
+           *
+           * API returns newest first.
+           */
+          setEvents((current) => {
+            const currentIds =
+              new Set(
+                current.map(
+                  (event) =>
+                    event.id
+                )
+              );
+
+            const uniqueNewEvents =
+              newEvents.filter(
+                (event) =>
+                  !currentIds.has(
+                    event.id
+                  )
+              );
+
+            if (
+              uniqueNewEvents.length === 0
+            ) {
+              return current;
+            }
+
+            return [
+              ...uniqueNewEvents,
+              ...current,
+            ];
+          });
+
+          /*
+           * Refresh task state without
+           * reloading the page.
+           */
+          try {
+            const accountResponse =
+              await fetch(
+                "/api/me",
+                {
+                  cache: "no-store",
+                }
+              );
+
+            if (
+              accountResponse.ok
+            ) {
+              const accountData =
+                await accountResponse.json();
+
+              setTasks(
+                accountData.tasks ??
+                  []
+              );
+
+              setBalance(
+                accountData.balance ??
+                  "0"
+              );
+            }
+          } catch (
+            accountRefreshError
+          ) {
+            console.error(
+              "Account refresh failed:",
+              accountRefreshError
+            );
+          }
+        } catch (error) {
+          console.error(
+            "Realtime event check failed:",
+            error
+          );
+        }
+      };
+
+    /*
+     * Run immediately.
+     */
+    checkEvents();
+
+    /*
+     * Then every second.
+     */
+    const interval =
+      window.setInterval(
+        checkEvents,
+        1000
+      );
+
+    return () => {
+      stopped = true;
+
+      window.clearInterval(
+        interval
+      );
     };
-
-  loadLatestEvents();
-
-  const interval =
-    window.setInterval(
-      loadLatestEvents,
-      1000
-    );
-
-  return () => {
-    stopped = true;
-    window.clearInterval(
-      interval
-    );
-  };
-}, [wallet]);
+  }, [wallet]);
 
   /* ==========================================================
      ROBINHOOD NETWORK
@@ -734,14 +864,23 @@ export default function Dashboard() {
       const verify =
         await verifyResponse.json();
 
-      if (!verifyResponse.ok) {
+      if (
+        !verifyResponse.ok
+      ) {
         throw new Error(
           verify.error ||
             "SIGNATURE VERIFICATION FAILED"
         );
       }
 
+      /*
+       * Load authenticated account.
+       */
       await loadAccount();
+
+      /*
+       * Load owned NFTs.
+       */
       await loadNFTs(address);
     } catch (err) {
       setError(
@@ -775,6 +914,9 @@ export default function Dashboard() {
 
       setNfts([]);
       setSelectedNFT(null);
+
+      lastEventIdsRef.current =
+        new Set();
 
       setNetworkReady(false);
       setError("");
@@ -886,7 +1028,6 @@ export default function Dashboard() {
 
             body: JSON.stringify({
               id: task.id,
-
               active:
                 !task.active,
             }),
@@ -985,9 +1126,20 @@ export default function Dashboard() {
           data.tasks ?? []
         );
 
-        setEvents(
-          data.events ?? []
-        );
+        const accountEvents =
+          Array.isArray(data.events)
+            ? data.events
+            : [];
+
+        setEvents(accountEvents);
+
+        lastEventIdsRef.current =
+          new Set(
+            accountEvents.map(
+              (event: EventItem) =>
+                event.id
+            )
+          );
 
         const ownedNFTs =
           normalizeNFTs(data);
@@ -1033,7 +1185,6 @@ export default function Dashboard() {
             SUPER COMPUTERS
 
           </div>
-
 
           <div className="boot-lines">
 
@@ -1087,7 +1238,6 @@ export default function Dashboard() {
 
         </div>
 
-
         <div className="os-center">
 
           <span className="top-label">
@@ -1119,7 +1269,6 @@ export default function Dashboard() {
           </span>
 
         </div>
-
 
         <div className="os-account">
 
@@ -1154,13 +1303,11 @@ export default function Dashboard() {
 
       </header>
 
-
       {/* ==================================================
           DESKTOP
       ================================================== */}
 
       <main className="desktop">
-
 
         {/* ==================================================
             SIDEBAR
@@ -1171,7 +1318,6 @@ export default function Dashboard() {
           <div className="sidebar-title">
             MY COMPUTER
           </div>
-
 
           {/* SELECTED NFT */}
 
@@ -1204,8 +1350,7 @@ export default function Dashboard() {
 
           </div>
 
-
-          {/* SELECTED NAME */}
+          {/* SELECTED NFT NAME */}
 
           {selectedNFT && (
 
@@ -1223,7 +1368,6 @@ export default function Dashboard() {
             </div>
 
           )}
-
 
           {/* NFT SELECTOR */}
 
@@ -1295,7 +1439,6 @@ export default function Dashboard() {
 
           )}
 
-
           {/* UNIT */}
 
           <div className="sidebar-unit">
@@ -1318,7 +1461,6 @@ export default function Dashboard() {
             </strong>
 
           </div>
-
 
           {/* MENU */}
 
@@ -1343,7 +1485,6 @@ export default function Dashboard() {
 
             </button>
 
-
             <button
               className={
                 tab === "signals"
@@ -1362,7 +1503,6 @@ export default function Dashboard() {
               SIGNAL LOG
 
             </button>
-
 
             <button
               className={
@@ -1387,7 +1527,6 @@ export default function Dashboard() {
 
             </button>
 
-
             <div className="coming-soon-menu">
 
               <div className="coming-soon-title">
@@ -1401,7 +1540,6 @@ export default function Dashboard() {
                 </small>
 
               </div>
-
 
               <div className="coming-soon-items">
 
@@ -1421,7 +1559,6 @@ export default function Dashboard() {
 
                 </div>
 
-
                 <div className="coming-soon-item">
 
                   <span>
@@ -1438,7 +1575,6 @@ export default function Dashboard() {
 
                 </div>
 
-
                 <div className="coming-soon-item">
 
                   <span>
@@ -1454,7 +1590,6 @@ export default function Dashboard() {
                   </small>
 
                 </div>
-
 
                 <div className="coming-soon-item">
 
@@ -1478,7 +1613,6 @@ export default function Dashboard() {
 
           </nav>
 
-
           {/* STATS */}
 
           <div className="sidebar-bottom">
@@ -1495,7 +1629,6 @@ export default function Dashboard() {
 
             </div>
 
-
             <div className="sidebar-stat">
 
               <span>
@@ -1509,7 +1642,6 @@ export default function Dashboard() {
               </strong>
 
             </div>
-
 
             <div className="sidebar-stat">
 
@@ -1530,7 +1662,6 @@ export default function Dashboard() {
           </div>
 
         </aside>
-
 
         {/* ==================================================
             MAIN WINDOW
@@ -1554,7 +1685,6 @@ export default function Dashboard() {
 
             </div>
 
-
             <div className="window-tools">
 
               <span>
@@ -1573,7 +1703,6 @@ export default function Dashboard() {
 
           </div>
 
-
           {/* ==================================================
               COMPUTER
           ================================================== */}
@@ -1581,7 +1710,6 @@ export default function Dashboard() {
           {tab === "computer" ? (
 
             <div className="window-body">
-
 
               <section className="worker-display">
 
@@ -1599,18 +1727,15 @@ export default function Dashboard() {
 
                   </div>
 
-
                   <div className="display-time">
                     {utcTime || "--:--:--"} UTC
                   </div>
 
                 </div>
 
-
                 <div className="display-screen">
 
                   <div className="pixel-grid" />
-
 
                   <div className="real-nft-display">
 
@@ -1640,7 +1765,6 @@ export default function Dashboard() {
                     )}
 
                   </div>
-
 
                   <div className="display-footer">
 
@@ -1680,7 +1804,6 @@ export default function Dashboard() {
 
               </section>
 
-
               {/* ASSIGNMENT */}
 
               <section className="assignment">
@@ -1699,16 +1822,13 @@ export default function Dashboard() {
 
                 </div>
 
-
                 <div className="assignment-grid">
-
 
                   <div className="job-picker">
 
                     <div className="field-label">
                       JOB TYPE
                     </div>
-
 
                     <div className="job-list">
 
@@ -1742,7 +1862,6 @@ export default function Dashboard() {
                               )}
                             </span>
 
-
                             <div>
 
                               <strong>
@@ -1772,13 +1891,11 @@ export default function Dashboard() {
 
                   </div>
 
-
                   <div className="assignment-form">
 
                     <div className="field-label">
                       TARGET
                     </div>
-
 
                     <input
                       value={target}
@@ -1795,11 +1912,9 @@ export default function Dashboard() {
                       }
                     />
 
-
                     <div className="field-label">
                       TRIGGER
                     </div>
-
 
                     <input
                       value={condition}
@@ -1819,7 +1934,6 @@ export default function Dashboard() {
                       }
                     />
 
-
                     <button
                       className="start-button"
                       onClick={
@@ -1835,7 +1949,6 @@ export default function Dashboard() {
                         : "▶ START WORKER"}
 
                     </button>
-
 
                     {error && (
 
@@ -1856,7 +1969,6 @@ export default function Dashboard() {
 
               </section>
 
-
               {/* ACTIVE WORKERS */}
 
               <section className="worker-list">
@@ -1872,7 +1984,6 @@ export default function Dashboard() {
                   </small>
 
                 </div>
-
 
                 {tasks.length === 0 ? (
 
@@ -1922,7 +2033,6 @@ export default function Dashboard() {
 
                           </div>
 
-
                           <div className="row-icon">
 
                             {taskIcon(
@@ -1930,7 +2040,6 @@ export default function Dashboard() {
                             )}
 
                           </div>
-
 
                           <div className="row-main">
 
@@ -1957,11 +2066,9 @@ export default function Dashboard() {
 
                             </div>
 
-
                             <div className="row-target">
                               {task.target}
                             </div>
-
 
                             <div className="row-condition">
 
@@ -1972,7 +2079,6 @@ export default function Dashboard() {
                             </div>
 
                           </div>
-
 
                           <div className="row-check">
 
@@ -1988,7 +2094,6 @@ export default function Dashboard() {
 
                           </div>
 
-
                           <div className="row-actions">
 
                             <button
@@ -1998,13 +2103,10 @@ export default function Dashboard() {
                                 )
                               }
                             >
-
                               {task.active
                                 ? "II"
                                 : "▶"}
-
                             </button>
-
 
                             <button
                               onClick={() =>
@@ -2052,7 +2154,6 @@ export default function Dashboard() {
                 </small>
 
               </div>
-
 
               {events.length === 0 ? (
 
@@ -2136,30 +2237,25 @@ export default function Dashboard() {
 
               </div>
 
-
               <div className="ai-soon-content">
 
                 <div className="ai-symbol">
                   ✦
                 </div>
 
-
                 <div className="ai-title">
                   AI WORKER
                 </div>
 
-
                 <div className="ai-status">
                   SYSTEM UNDER DEVELOPMENT
                 </div>
-
 
                 <p>
                   Your Computer will soon
                   be able to use AI assisted
                   workers.
                 </p>
-
 
                 <div className="ai-progress">
 
@@ -2174,7 +2270,6 @@ export default function Dashboard() {
 
                 </div>
 
-
                 <div className="ai-soon-label">
                   COMING SOON
                 </div>
@@ -2188,7 +2283,6 @@ export default function Dashboard() {
         </section>
 
       </main>
-
 
       {/* ==================================================
           FOOTER

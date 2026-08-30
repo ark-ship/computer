@@ -4,9 +4,10 @@
   "/api/auth/challenge/route": "app/api/auth/challenge/route.js",
   "/api/auth/verify/route": "app/api/auth/verify/route.js",
   "/api/events/latest/route": "app/api/events/latest/route.js",
-  "/api/worker/route": "app/api/worker/route.js",
   "/api/me/route": "app/api/me/route.js",
   "/api/tasks/route": "app/api/tasks/route.js",
+  "/api/worker/route": "app/api/worker/route.js",
+  "/api/webhooks/alchemy-multi/route": "app/api/webhooks/alchemy-multi/route.js",
   "/api/webhooks/alchemy/route": "app/api/webhooks/alchemy/route.js",
   "/page": "app/page.js"
 }
